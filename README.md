@@ -6,16 +6,15 @@
     *   線性迴歸 (Linear Regression)
     *   多項式迴歸 (Polynomial Regression)
     *   邏輯迴歸 (Logistic Regression)
-
-2.  **正規化 (Regularization)**
-    *   L1 正規化 (Lasso Regression)
-    *   L2 正規化 (Ridge Regression)
-    *   彈性網路 (Elastic Net)
-
-3.  **驗證 (Validation)**
+2.  **驗證 (Validation)**
     *   交叉驗證 (Cross-validation)
     *   自助法 (Bootstrapping)
     *   模型評估指標 (Model Evaluation Metrics)
+
+3.  **正規化 (Regularization)**
+    *   L1 正規化 (Lasso Regression)
+    *   L2 正規化 (Ridge Regression)
+    *   彈性網路 (Elastic Net)
 
 4.  **類神經網路 (Artificial Neural Networks)**
     *   感知器 (Perceptron)
