@@ -251,7 +251,6 @@ disp.plot(cmap='Blues', values_format='d')
 plt.title('Confusion Matrix')
 plt.show()
 
-# 計算並打印其他評估指標
 tn, fp, fn, tp = cm.ravel()
 precision = tp / (tp + fp)
 recall = tp / (tp + fn)
