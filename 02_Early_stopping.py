@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from copy import deepcopy
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import root_mean_squared_error
 from sklearn.preprocessing import StandardScaler, PolynomialFeatures
 from sklearn.linear_model import LinearRegression, SGDRegressor
 from sklearn.pipeline import make_pipeline
@@ -26,14 +26,14 @@ train_errors, val_errors = [], []  # extra code – it's for the figure below
 for epoch in range(n_epochs):
     sgd_reg.partial_fit(X_train_prep, y_train)
     y_valid_predict = sgd_reg.predict(X_valid_prep)
-    val_error = mean_squared_error(y_valid, y_valid_predict, squared=False)
+    val_error = root_mean_squared_error(y_valid, y_valid_predict)
     if val_error < best_valid_rmse:
         best_valid_rmse = val_error
         best_model = deepcopy(sgd_reg)
 
     # extra code – we evaluate the train error and save it for the figure
     y_train_predict = sgd_reg.predict(X_train_prep)
-    train_error = mean_squared_error(y_train, y_train_predict, squared=False)
+    train_error = root_mean_squared_error(y_train, y_train_predict)
     val_errors.append(val_error)
     train_errors.append(train_error)
 
