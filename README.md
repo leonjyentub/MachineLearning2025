@@ -16,23 +16,20 @@
     *   L2 正規化 (Ridge Regression)
     *   彈性網路 (Elastic Net)
 
-4.  **類神經網路 (Artificial Neural Networks)**
-    *   感知器 (Perceptron)
-    *   多層感知器 (Multi-layer Perceptron, MLP)
-    *   反向傳播 (Backpropagation)
-
 5.  **支持向量機 (Support Vector Machines, SVM)**
     *   線性 SVM
     *   核函數 (Kernel Functions)
     *   非線性 SVM
 
-6.  **機率模型 (Probabilistic Models)**
-    *   貝氏分類器 (Naive Bayes Classifier)
-
 7.  **決策樹 (Decision Trees)**
     *   ID3, C4.5, CART 演算法
     *   隨機森林 (Random Forest)
     *   梯度提升 (Gradient Boosting)
+
+4.  **類神經網路 (Artificial Neural Networks)**
+    *   感知器 (Perceptron)
+    *   多層感知器 (Multi-layer Perceptron, MLP)
+    *   反向傳播 (Backpropagation)
 
 8.  **非監督式學習 (Unsupervised Learning)**
     *   分群 (Clustering)
