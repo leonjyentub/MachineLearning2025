@@ -152,6 +152,83 @@ class DecisionTreeClassifier(object):
             return cur_layer.get('val')
 
 
+# ====== 工具函式：把 numpy / Counter 轉成純 Python，避免標籤出現奇怪型別 ======
+def to_py_scalar(x):
+    if isinstance(x, (np.generic,)):
+        return x.item()
+    return x
+
+def normalize_counts(cnt):
+    if cnt is None:
+        return {}
+    # Counter 的 key 可能是 numpy.int64；統一轉成 int
+    norm = {}
+    for k, v in cnt.items():
+        norm[int(to_py_scalar(k))] = int(to_py_scalar(v))
+    return norm
+
+def node_label(node):
+    # 產生節點的顯示文字
+    counts = normalize_counts(node.get('count'))
+    pred = node.get('val', None)
+    if pred is not None:
+        pred = to_py_scalar(pred)
+
+    if 'col' in node and 'cutoff' in node:
+        col = str(node['col'])
+        cutoff = to_py_scalar(node['cutoff'])
+        lines = [
+            f"{col}",
+            f"cutoff = {cutoff}",
+            f"pred = {pred}",
+            f"counts = {counts}"
+        ]
+        return " | ".join(lines)
+    else:
+        lines = [
+            "Leaf",
+            f"pred = {pred}",
+            f"counts = {counts}"
+        ]
+        return " | ".join(lines)
+
+# ====== 遞迴把樹加到 Graphviz 圖上 ======
+def add_nodes_edges(g, node, node_id=0):
+    this_id = node_id
+    g.node(str(this_id), label=node_label(node), shape="box", fontsize="10")
+
+    next_id = node_id + 1
+
+    # 左子樹
+    if node.get('left') is not None:
+        left_id = next_id
+        next_id = add_nodes_edges(g, node['left'], left_id)
+        # 邊的標籤：<= cutoff（如果有 cutoff）
+        edge_label = ""
+        if 'cutoff' in node:
+            edge_label = f"≤ {to_py_scalar(node['cutoff'])}"
+        g.edge(str(this_id), str(left_id), label=edge_label)
+    # 右子樹
+    if node.get('right') is not None:
+        right_id = next_id
+        next_id = add_nodes_edges(g, node['right'], right_id)
+        edge_label = ""
+        if 'cutoff' in node:
+            edge_label = f"> {to_py_scalar(node['cutoff'])}"
+        g.edge(str(this_id), str(right_id), label=edge_label)
+
+    return next_id
+
+from graphviz import Digraph
+
+def draw_tree_graph(tree_dict, filename="decision_tree"):
+    g = Digraph("DecisionTree", format="png")
+    g.attr(rankdir="TB")  # 從上到下
+    g.attr('node', shape='box', style='rounded')
+    add_nodes_edges(g, tree_dict, 0)
+    outpath = g.render(filename=filename, cleanup=True)
+    print(f"輸出圖檔：{outpath}")
+
 if __name__ == "__main__":
     iris = datasets.load_iris()
     x = iris.data  # [:, [2, 3]]
@@ -161,9 +238,10 @@ if __name__ == "__main__":
     X_train, X_test, y_train, y_test = train_test_split(
         x, y, test_size=0.3, random_state=42)
 
-    clf = DecisionTreeClassifier(max_depth=1)
+    clf = DecisionTreeClassifier(max_depth=4)
     clf.fit(X_train, y_train)
     pprint(clf.trees)
+    draw_tree_graph(clf.trees, filename="decision_tree")
     y_pred = clf.predict(X_test)
     print(y_pred)
     print(y_test)
