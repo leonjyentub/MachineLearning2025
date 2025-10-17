@@ -6,7 +6,7 @@
 
 ## 環境設定與安裝 (Setup)
 
-在開始之前，請確保您已經安裝了 Python。建議建立一個虛擬環境來管理專案的依賴套件。
+在開始之前，請確保您已經安裝了 Python 與 uv。建議建立一個虛擬環境來管理專案的依賴套件。
 
 1.  **複製儲存庫 (Clone the repository):**
     ```bash
@@ -16,15 +16,34 @@
 
 2.  **建立並啟用虛擬環境 (Create and activate a virtual environment):**
     ```bash
-    python -m venv .venv
+    uv venv
     source .venv/bin/activate  # On Windows, use `.venv\Scripts\activate`
     ```
 
 3.  **安裝必要的函式庫 (Install dependencies):**
-    這個專案可能需要以下函式庫，您可以透過 `pip` 進行安裝。
+    這個專案的依賴套件被定義在 `pyproject.toml` 檔案中。請使用 `uv pip sync` 來安裝它們。
     ```bash
-    pip install numpy pandas scikit-learn matplotlib seaborn torch torchvision tensorflow jupyter
+    uv pip sync pyproject.toml
     ```
+
+4.  **安裝 Graphviz 可執行檔 (Install Graphviz Executable):**
+    專案中使用 `graphviz` 套件來繪製圖形，它需要系統已安裝對應的可執行檔。請根據您的作業系統選擇以下安裝方式：
+
+    *   **Windows:**
+        ```bash
+        winget install -e --id Graphviz.Graphviz
+        ```
+
+    *   **macOS (使用 Homebrew):**
+        ```bash
+        brew install graphviz
+        ```
+
+    *   **Ubuntu/Debian:**
+        ```bash
+        sudo apt-get update
+        sudo apt-get install -y graphviz
+        ```
 
 ## 程式碼結構說明 (Code Structure)
 
