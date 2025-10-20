@@ -1,22 +1,27 @@
 import matplotlib.pyplot as plt
 import numpy as np
-import torch
+from sklearn.datasets import fetch_openml
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
-from torchvision import datasets, transforms
 
 # 設定隨機種子
-torch.manual_seed(42)
+np.random.seed(42)
 
-# 加載MNIST數據集
-transform = transforms.Compose([transforms.ToTensor()])
-mnist_dataset = datasets.MNIST('drive/My Drive/mnist/MNIST_data/', train=True, download=False, transform=transform)
+# 使用 sklearn 加載 MNIST 資料集
+print("正在下載 MNIST 資料集...")
+mnist = fetch_openml('mnist_784', version=1, parser='auto')
+X = mnist.data.to_numpy() / 255.0  # 歸一化到 [0, 1]
+y = mnist.target.astype(np.uint8).to_numpy()
 
-# 提取數據和標籤
-X = mnist_dataset.data.numpy().reshape(-1, 28*28) / 255.0  # 將圖像展平並歸一化
-y = mnist_dataset.targets.numpy()
+# 只使用訓練集的前60000筆資料
+X = X[:60000]
+y = y[:60000]
+
+print(f"資料形狀: {X.shape}")
+print(f"標籤形狀: {y.shape}")
 
 # 使用t-SNE降維到2維
+print("正在執行 t-SNE 降維...")
 tsne = TSNE(n_components=2, random_state=42)
 X_tsne = tsne.fit_transform(X)
 
@@ -28,5 +33,5 @@ plt.title('t-SNE visualization of MNIST digits')
 plt.xlabel('t-SNE component 1')
 plt.ylabel('t-SNE component 2')
 plt.tight_layout()
-plt.savefig('14.tSNE-MNIST.jpg', dpi=300)
+plt.savefig('04_tSNE-MNIST.jpg', dpi=300)
 plt.show()

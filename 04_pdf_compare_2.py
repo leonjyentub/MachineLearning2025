@@ -1,3 +1,4 @@
+# 跟04_pdf_compare_1.py的分別不大，主要是把計算高斯分佈的部分改成用函數實現，並且調整了一些參數
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.stats import t

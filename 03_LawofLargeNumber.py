@@ -3,8 +3,10 @@ import numpy as np
 
 heads_proba = 0.51
 np.random.seed(42)
+# 生成 10000 次、2 欄的擲硬幣結果矩陣；True/1 表示正面，False/0 表示反面
 coin_tosses = (np.random.rand(10000, 2) < heads_proba).astype(np.int32)
 print(coin_tosses)
+# 沿列方向做累加，得到每一步的累積正面次數（對每一欄各自計算）
 cumulative_heads = coin_tosses.cumsum(axis=0)
 print(cumulative_heads)
 cumulative_heads_ratio = cumulative_heads / np.arange(1, 10001).reshape(-1, 1)

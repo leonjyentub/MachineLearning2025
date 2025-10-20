@@ -246,7 +246,7 @@ if __name__ == "__main__":
     print(y_pred)
     print(y_test)
     print(
-        f"train accuracy: {accuracy_score(y_true=y_test, y_pred=y_pred)*100} %")
+        f"pred accuracy: {accuracy_score(y_true=y_test, y_pred=y_pred)*100} %")
     cm = confusion_matrix(y_test, y_pred)
     disp = ConfusionMatrixDisplay(
         confusion_matrix=cm, display_labels=['0', '1', '2'])

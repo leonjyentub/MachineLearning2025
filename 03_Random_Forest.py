@@ -66,6 +66,5 @@ plt.legend(['Class 0', 'Class 1'], loc='upper right')
 plt.tight_layout()
 plt.show()
 
-# 打印模型效能
 print(f"Training accuracy: {rf_classifier.score(X_train_scaled, y_train):.3f}")
 print(f"Test accuracy: {rf_classifier.score(X_test_scaled, y_test):.3f}")

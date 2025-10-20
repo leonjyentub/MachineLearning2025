@@ -14,7 +14,7 @@ y = 2 * x + 1 + np.random.randn(10) * 5  # y = 2x + 1，加上少量隨機噪音
 # 合併為100筆2維數據
 data = np.vstack((x, y)).T
 
-# 3. 自己實現的PCA流程
+# 3. 手刻PCA流程
 # 3.1 對數據進行標準化處理
 mean = np.mean(data, axis=0)
 std_dev = np.std(data, axis=0)
@@ -52,7 +52,7 @@ plt.ylabel('X2', fontproperties=chi_font)
 # 中圖: 自己實現的PCA降維後的數據
 plt.subplot(1, 3, 2)
 plt.scatter(pca_data_manual, np.zeros_like(pca_data_manual), color='red')
-plt.title('自己實現的PCA降維後的1D數據', fontproperties=chi_font)
+plt.title('手刻~的PCA降維後的1D數據', fontproperties=chi_font)
 plt.xlabel('第一主成分', fontproperties=chi_font)
 plt.ylabel('', fontproperties=chi_font)
 
