@@ -69,8 +69,7 @@ def mish_derivative(x):
 x = np.linspace(-5, 5, 200)
 
 # 設置圖表
-plt.figure(figsize=(20, 15))
-plt.style.use('seaborn')
+plt.figure(figsize=(18, 8))
 
 # 繪製活化函數
 plt.subplot(2, 2, 1)
@@ -123,5 +122,4 @@ plt.xlabel('x', fontsize=12)
 plt.ylabel('f\'(x)', fontsize=12)
 
 plt.tight_layout()
-plt.savefig('17.Activation_functions.png', dpi=300)
 plt.show()
