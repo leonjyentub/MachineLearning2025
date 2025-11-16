@@ -1,9 +1,9 @@
-#強化式學習練習
+# 強化式學習練習
 import random
-import tkinter as tk
 from collections import deque
 
 import numpy as np
+import pygame
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -16,10 +16,28 @@ GOAL = (GRID_SIZE-1, GRID_SIZE-1)
 # 定義動作: 右、左、下、上
 ACTIONS = [(0, 1), (0, -1), (1, 0), (-1, 0)]
 
-# 在檔案開頭的常數定義部分加入：
-OBSTACLES = [(1, 1), (3, 1), (1, 3), (4, 2), (5, 3), (4, 5)]  # 定義障礙物位置
+# 定義障礙物位置
+OBSTACLES = [(1, 1), (3, 1), (1, 3), (4, 2), (5, 3), (4, 5)]
 
 max_epochs = 200
+
+# 新增 pygame 相關常數
+WINDOW_WIDTH = 600
+WINDOW_HEIGHT = 700
+GRID_OFFSET_Y = 100  # 為按鈕和文字預留空間
+CELL_SIZE = 500 // GRID_SIZE
+
+# 顏色定義
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+GREEN = (0, 255, 0)
+RED = (255, 0, 0)
+BLUE = (0, 0, 255)
+GRAY = (128, 128, 128)
+LIGHT_GRAY = (200, 200, 200)
+BUTTON_COLOR = (70, 130, 180)
+BUTTON_HOVER = (100, 160, 210)
+
 # 新增 DQN 網路結構
 class DQN(nn.Module):
     def __init__(self):
@@ -130,127 +148,155 @@ class QLearningAgent:
 
 class GridWorldGUI:
     def __init__(self):
-        self.root = tk.Tk()
-        self.root.title("Reinforcement Learning Grid World")
-
-        # 建立按鈕框架
-        self.button_frame = tk.Frame(self.root)
-        self.button_frame.pack(pady=5)
-
-        # 建立三個按鈕
-        self.qlearn_button = tk.Button(self.button_frame, text="Train Q-Learning",
-                                     command=self.train_qlearning)
-        self.qlearn_button.pack(side=tk.LEFT, padx=5)
-
-        self.dqn_button = tk.Button(self.button_frame, text="Train DQN",
-                                   command=self.train_dqn)
-        self.dqn_button.pack(side=tk.LEFT, padx=5)
-
-        self.reset_button = tk.Button(self.button_frame, text="Reset",
-                                    command=self.reset_environment)
-        self.reset_button.pack(side=tk.LEFT, padx=5)
-
-        # 新增進度標籤
-        self.progress_label = tk.Label(self.root, text="訓練進度: 0/" + str(max_epochs))
-        self.progress_label.pack(pady=5)
-
-        self.canvas = tk.Canvas(self.root, width=400, height=400)
-        self.canvas.pack()
+        pygame.init()
+        self.screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
+        pygame.display.set_caption("Reinforcement Learning Grid World")
+        self.clock = pygame.time.Clock()
+        self.font = pygame.font.Font(None, 24)
+        self.title_font = pygame.font.Font(None, 32)
 
         self.env = GridWorld()
         self.q_agent = QLearningAgent()
         self.dqn_agent = DQNAgent()
 
-        self.cell_size = 400 // GRID_SIZE
-        self.agent_oval = None
         self.obstacles = OBSTACLES
+        self.agent_pos = START
+        
+        # 訓練狀態
+        self.training = False
+        self.training_method = None  # 'qlearning' or 'dqn'
+        self.epoch = 0
+        self.progress_text = "訓練進度: 0/" + str(max_epochs)
 
-        self.draw_grid()
+        # 按鈕定義 (x, y, width, height, text, action)
+        self.buttons = [
+            {'rect': pygame.Rect(50, 30, 150, 40), 'text': 'Train Q-Learning', 
+             'action': 'qlearning', 'color': BUTTON_COLOR},
+            {'rect': pygame.Rect(220, 30, 150, 40), 'text': 'Train DQN', 
+             'action': 'dqn', 'color': BUTTON_COLOR},
+            {'rect': pygame.Rect(390, 30, 150, 40), 'text': 'Reset', 
+             'action': 'reset', 'color': BUTTON_COLOR}
+        ]
+
+        self.running = True
 
     def reset_environment(self):
         self.env = GridWorld()
         self.q_agent = QLearningAgent()
         self.dqn_agent = DQNAgent()
-        state = self.env.reset()
-        self.draw_grid()
-        self.draw_agent(state)
-        # 重置進度標籤
-        self.progress_label.config(text="訓練進度: 0/" + str(max_epochs))
+        self.agent_pos = self.env.reset()
+        self.training = False
+        self.training_method = None
+        self.epoch = 0
+        self.progress_text = "訓練進度: 0/" + str(max_epochs)
 
-    def train_qlearning(self):
-        state = self.env.reset()
-        self.draw_agent(state)
+    def start_training(self, method):
+        self.training = True
+        self.training_method = method
+        self.epoch = 0
+        self.agent_pos = self.env.reset()
 
-        for epoch in range(max_epochs):
-            # 更新進度標籤
-            self.progress_label.config(text=f"Q-Learning 訓練進度: {epoch+1}/{max_epochs}")
+    def train_step(self):
+        if not self.training or self.epoch >= max_epochs:
+            self.training = False
+            return
 
+        state = self.agent_pos
+
+        if self.training_method == 'qlearning':
             action = self.q_agent.get_action(state)
             next_state, reward, done = self.env.step(action)
             self.q_agent.learn(state, action, reward, next_state)
-
-            self.draw_agent(next_state)
-            self.root.update()
-            self.root.after(100)
-
-            state = next_state
-            if done:
-                break
-
-    def train_dqn(self):
-        state = self.env.reset()
-        self.draw_agent(state)
-
-        for epoch in range(max_epochs):
-            # 更新進度標籤
-            self.progress_label.config(text=f"DQN 訓練進度: {epoch+1}/{max_epochs}")
-
+            self.progress_text = f"Q-Learning 訓練進度: {self.epoch+1}/{max_epochs}"
+        else:  # dqn
             action = self.dqn_agent.get_action(state)
             next_state, reward, done = self.env.step(action)
             self.dqn_agent.store_transition(state, action, reward, next_state)
             self.dqn_agent.learn()
+            self.progress_text = f"DQN 訓練進度: {self.epoch+1}/{max_epochs}"
 
-            self.draw_agent(next_state)
-            self.root.update()
-            self.root.after(100)
+        self.agent_pos = next_state
+        self.epoch += 1
 
-            state = next_state
-            if done:
-                break
+        if done:
+            self.training = False
 
     def draw_grid(self):
-        self.canvas.delete("all")
-        # 畫格子
+        # 繪製格子
         for i in range(GRID_SIZE):
             for j in range(GRID_SIZE):
-                x1 = j * self.cell_size
-                y1 = i * self.cell_size
-                x2 = x1 + self.cell_size
-                y2 = y1 + self.cell_size
-                # 如果是障礙物，填充灰色
+                x = 50 + j * CELL_SIZE
+                y = GRID_OFFSET_Y + i * CELL_SIZE
+                
+                # 繪製格子背景
                 if (i, j) in self.obstacles:
-                    self.canvas.create_rectangle(x1, y1, x2, y2, fill="gray")
+                    pygame.draw.rect(self.screen, GRAY, (x, y, CELL_SIZE, CELL_SIZE))
+                elif (i, j) == START:
+                    pygame.draw.rect(self.screen, GREEN, (x, y, CELL_SIZE, CELL_SIZE))
+                elif (i, j) == GOAL:
+                    pygame.draw.rect(self.screen, RED, (x, y, CELL_SIZE, CELL_SIZE))
                 else:
-                    self.canvas.create_rectangle(x1, y1, x2, y2, fill="white")
+                    pygame.draw.rect(self.screen, WHITE, (x, y, CELL_SIZE, CELL_SIZE))
+                
+                # 繪製格子邊框
+                pygame.draw.rect(self.screen, BLACK, (x, y, CELL_SIZE, CELL_SIZE), 1)
 
-        # 標記起點和終點
-        self.canvas.create_rectangle(0, 0, self.cell_size, self.cell_size, fill="green")
-        self.canvas.create_rectangle(
-            (GRID_SIZE-1)*self.cell_size, (GRID_SIZE-1)*self.cell_size,
-            GRID_SIZE*self.cell_size, GRID_SIZE*self.cell_size,
-            fill="red"
-        )
+    def draw_agent(self):
+        x = 50 + self.agent_pos[1] * CELL_SIZE + CELL_SIZE // 2
+        y = GRID_OFFSET_Y + self.agent_pos[0] * CELL_SIZE + CELL_SIZE // 2
+        radius = CELL_SIZE // 4
+        pygame.draw.circle(self.screen, BLUE, (x, y), radius)
 
-    def draw_agent(self, state):
-        if self.agent_oval:
-            self.canvas.delete(self.agent_oval)
-        x = state[1] * self.cell_size + self.cell_size//4
-        y = state[0] * self.cell_size + self.cell_size//4
-        size = self.cell_size//2
-        self.agent_oval = self.canvas.create_oval(x, y, x+size, y+size, fill="blue")
+    def draw_buttons(self, mouse_pos):
+        for button in self.buttons:
+            # 檢查滑鼠是否懸停在按鈕上
+            color = BUTTON_HOVER if button['rect'].collidepoint(mouse_pos) else button['color']
+            pygame.draw.rect(self.screen, color, button['rect'])
+            pygame.draw.rect(self.screen, BLACK, button['rect'], 2)
+            
+            # 繪製按鈕文字
+            text_surface = self.font.render(button['text'], True, WHITE)
+            text_rect = text_surface.get_rect(center=button['rect'].center)
+            self.screen.blit(text_surface, text_rect)
+
+    def draw_progress(self):
+        text_surface = self.font.render(self.progress_text, True, BLACK)
+        self.screen.blit(text_surface, (50, 75))
+
+    def handle_button_click(self, mouse_pos):
+        for button in self.buttons:
+            if button['rect'].collidepoint(mouse_pos):
+                if button['action'] == 'reset':
+                    self.reset_environment()
+                elif button['action'] in ['qlearning', 'dqn']:
+                    self.start_training(button['action'])
 
     def run(self):
-        self.root.mainloop()
+        while self.running:
+            mouse_pos = pygame.mouse.get_pos()
+            
+            # 事件處理
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    self.running = False
+                elif event.type == pygame.MOUSEBUTTONDOWN:
+                    self.handle_button_click(mouse_pos)
+
+            # 訓練步驟
+            if self.training:
+                self.train_step()
+
+            # 繪製
+            self.screen.fill(LIGHT_GRAY)
+            self.draw_buttons(mouse_pos)
+            self.draw_progress()
+            self.draw_grid()
+            self.draw_agent()
+
+            pygame.display.flip()
+            self.clock.tick(10)  # 控制訓練速度，每秒10幀
+
+        pygame.quit()
 
 # 創建並運行GUI
 app = GridWorldGUI()

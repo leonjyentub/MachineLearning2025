@@ -1,11 +1,31 @@
 import random
-import tkinter as tk
 from collections import deque
 
 import numpy as np
+import pygame
 import torch
 import torch.nn as nn
 import torch.optim as optim
+
+# pygame 相關常數定義
+WINDOW_WIDTH = 600
+WINDOW_HEIGHT = 500
+BOARD_SIZE = 300
+BOARD_OFFSET_X = 150
+BOARD_OFFSET_Y = 120
+CELL_SIZE = BOARD_SIZE // 3
+
+# 顏色定義
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+GRAY = (200, 200, 200)
+LIGHT_GRAY = (240, 240, 240)
+BLUE = (0, 100, 255)
+RED = (255, 50, 50)
+GREEN = (50, 200, 50)
+BUTTON_COLOR = (70, 130, 180)
+BUTTON_HOVER = (100, 160, 210)
+BUTTON_DISABLED = (150, 150, 150)
 
 
 # 定義 Tic-Tac-Toe 環境
@@ -163,206 +183,337 @@ class DQNAgent:
     def update_target_network(self):
         self.target_net.load_state_dict(self.policy_net.state_dict())
 
-# Tic-Tac-Toe GUI
+# Tic-Tac-Toe GUI with pygame
 class TicTacToeGUI:
-    def __init__(self, master):
-        self.master = master
-        self.master.title("Tic-Tac-Toe Reinforcement Learning")
+    def __init__(self):
+        pygame.init()
+        self.screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
+        pygame.display.set_caption("Tic-Tac-Toe Reinforcement Learning")
+        self.clock = pygame.time.Clock()
+        self.font = pygame.font.Font(None, 28)
+        self.title_font = pygame.font.Font(None, 36)
+        self.message_font = pygame.font.Font(None, 32)
+
         self.env = TicTacToeEnv()
 
         # 初始化代理
         self.q_agent = QLearningAgent()
         self.dqn_agent = DQNAgent()
 
-        self.current_agent = None  # 'Q' 或 'DQN'
+        self.current_agent = None  # 'Q' 或 'DQN' 或 None
         self.max_epochs = 1000
+        self.current_epoch = 0
+        self.training = False
 
-        # 設置GUI元素
-        self.button_frame = tk.Frame(self.master)
-        self.button_frame.pack(pady=5)
+        # 遊戲狀態
+        self.game_over = False
+        self.winner = None
+        self.message = ""
 
-        self.train_q_button = tk.Button(self.button_frame, text="Train Q-Learning", command=self.train_qlearning)
-        self.train_q_button.pack(side=tk.LEFT, padx=5)
+        # 按鈕定義 (x, y, width, height, text, action)
+        self.buttons = [
+            {'rect': pygame.Rect(50, 30, 150, 40), 'text': 'Train Q-Learning',
+             'action': 'train_q', 'color': BUTTON_COLOR},
+            {'rect': pygame.Rect(225, 30, 150, 40), 'text': 'Train DQN',
+             'action': 'train_dqn', 'color': BUTTON_COLOR},
+            {'rect': pygame.Rect(400, 30, 150, 40), 'text': 'Reset',
+             'action': 'reset', 'color': BUTTON_COLOR}
+        ]
 
-        self.train_dqn_button = tk.Button(self.button_frame, text="Train DQN", command=self.train_dqn)
-        self.train_dqn_button.pack(side=tk.LEFT, padx=5)
-
-        self.reset_button = tk.Button(self.button_frame, text="Reset", command=self.reset_environment)
-        self.reset_button.pack(side=tk.LEFT, padx=5)
-
-        self.progress_label = tk.Label(self.master, text="Training Progress: 0/1000")
-        self.progress_label.pack(pady=5)
-
-        self.canvas = tk.Canvas(self.master, width=300, height=300)
-        self.canvas.pack()
-        self.canvas.bind("<Button-1>", self.human_move)
-
-        self.draw_grid()
-        self.reset_environment()
+        self.progress_text = "Training Progress: 0/1000"
+        self.running = True
 
     def reset_environment(self):
+        """重置環境"""
         self.env.reset()
         self.current_agent = None
-        self.progress_label.config(text="Training Progress: 0/1000")
-        self.draw_grid()
-        self.draw_agent()
+        self.training = False
+        self.current_epoch = 0
+        self.game_over = False
+        self.winner = None
+        self.message = ""
+        self.progress_text = "Training Progress: 0/1000"
 
-    def draw_grid(self):
-        self.canvas.delete("all")
-        for i in range(4):
-            # 繪製水平線
-            self.canvas.create_line(0, i * 100, 300, i * 100)
-            # 繪製垂直線
-            self.canvas.create_line(i * 100, 0, i * 100, 300)
+    def start_training(self, agent_type):
+        """開始訓練"""
+        self.current_agent = agent_type
+        self.training = True
+        self.current_epoch = 0
+        self.env.reset()
 
-    def draw_agent(self):
-        self.canvas.delete("agent")
-        for i in range(3):
-            for j in range(3):
-                if self.env.board[i, j] == 1:
-                    self.canvas.create_line(j * 100 + 20, i * 100 + 20, j * 100 + 80, i * 100 + 80, width=2, fill="blue", tags="agent")
-                    self.canvas.create_line(j * 100 + 80, i * 100 + 20, j * 100 + 20, i * 100 + 80, width=2, fill="blue", tags="agent")
-                elif self.env.board[i, j] == -1:
-                    self.canvas.create_oval(j * 100 + 20, i * 100 + 20, j * 100 + 80, i * 100 + 80, width=2, outline="red", tags="agent")
-
-    def train_qlearning(self):
-        self.current_agent = 'Q'
-        self.progress_label.config(text="Training Q-Learning: 0/1000")
-        self.master.after(100, self.run_qlearning_epoch, 0)
-
-    def run_qlearning_epoch(self, epoch):
-        if epoch >= self.max_epochs:
+    def train_step(self):
+        """執行一個訓練 epoch"""
+        if not self.training or self.current_epoch >= self.max_epochs:
+            self.training = False
             return
+
         state = self.env.reset()
         done = False
+
         while not done:
             available_actions = self.get_available_actions()
-            action = self.q_agent.choose_action(state, available_actions)
-            next_state, reward, done = self.env.step(action)
-            next_available_actions = self.get_available_actions()
-            self.q_agent.learn(state, action, reward, next_state, next_available_actions, done)
+            if self.current_agent == 'Q':
+                action = self.q_agent.choose_action(state, available_actions)
+                next_state, reward, done = self.env.step(action)
+                next_available_actions = self.get_available_actions()
+                self.q_agent.learn(state, action, reward, next_state, next_available_actions, done)
+            else:  # DQN
+                action = self.dqn_agent.get_action(state, available_actions)
+                next_state, reward, done = self.env.step(action)
+                next_available_actions = self.get_available_actions()
+                self.dqn_agent.store_transition(state, action, reward, next_state, next_available_actions, done)
+                self.dqn_agent.learn_from_memory()
             state = next_state
-        self.progress_label.config(text=f"Training Q-Learning: {epoch+1}/{self.max_epochs}")
-        self.master.update()
-        self.master.after(1, self.run_qlearning_epoch, epoch + 1)
 
-    def train_dqn(self):
-        self.current_agent = 'DQN'
-        self.progress_label.config(text="Training DQN: 0/1000")
-        self.master.after(100, self.run_dqn_epoch, 0)
+        if self.current_agent == 'DQN':
+            self.dqn_agent.update_target_network()
 
-    def run_dqn_epoch(self, epoch):
-        if epoch >= self.max_epochs:
-            return
-        state = self.env.reset()
-        done = False
-        while not done:
-            available_actions = self.get_available_actions()
-            action = self.dqn_agent.get_action(state, available_actions)
-            next_state, reward, done = self.env.step(action)
-            next_available_actions = self.get_available_actions()
-            self.dqn_agent.store_transition(state, action, reward, next_state, next_available_actions, done)
-            self.dqn_agent.learn_from_memory()
-            state = next_state
-        self.dqn_agent.update_target_network()
-        self.progress_label.config(text=f"Training DQN: {epoch+1}/{self.max_epochs}")
-        self.master.update()
-        self.master.after(1, self.run_dqn_epoch, epoch + 1)
+        self.current_epoch += 1
+        agent_name = "Q-Learning" if self.current_agent == 'Q' else "DQN"
+        self.progress_text = f"Training {agent_name}: {self.current_epoch}/{self.max_epochs}"
+
+        if self.current_epoch >= self.max_epochs:
+            self.training = False
 
     def get_available_actions(self):
+        """獲取可用動作"""
         return [i for i in range(9) if self.env.board.flatten()[i] == 0]
 
-    def human_move(self, event):
-        if self.current_agent is not None:
-            return  # 鍛鍊期間禁用人類移動
-        x, y = event.x, event.y
-        row, col = y // 100, x // 100
+    def handle_click(self, pos):
+        """處理滑鼠點擊"""
+        # 檢查按鈕點擊
+        for button in self.buttons:
+            if button['rect'].collidepoint(pos):
+                if button['action'] == 'reset':
+                    self.reset_environment()
+                elif button['action'] == 'train_q':
+                    self.start_training('Q')
+                elif button['action'] == 'train_dqn':
+                    self.start_training('DQN')
+                return
+
+        # 檢查棋盤點擊（只在非訓練狀態下允許）
+        if self.training or self.game_over:
+            return
+
+        # 計算點擊的格子
+        if (BOARD_OFFSET_X <= pos[0] < BOARD_OFFSET_X + BOARD_SIZE and
+            BOARD_OFFSET_Y <= pos[1] < BOARD_OFFSET_Y + BOARD_SIZE):
+            col = (pos[0] - BOARD_OFFSET_X) // CELL_SIZE
+            row = (pos[1] - BOARD_OFFSET_Y) // CELL_SIZE
+            self.human_move(row, col)
+
+    def human_move(self, row, col):
+        """處理人類玩家的移動"""
         action = row * 3 + col
         if self.env.board[row, col] != 0:
             return
-        self.env.board[row, col] = -1  # 人類是 -1
+
+        # 人類下棋（使用 -1）
+        self.env.board[row, col] = -1
         done, winner = self.env.check_game_over()
-        self.draw_agent()
+
         if done:
+            self.game_over = True
+            self.winner = winner
             self.show_result(winner)
             return
-        # 代理人回應
+
+        # AI 回應
         state = self.env.get_state()
         available_actions = self.get_available_actions()
-        # 這裡以Q-Learning為例
-        action = self.q_agent.choose_action(state, available_actions)
-        self.env.step(action)
-        self.draw_agent()
-        done, winner = self.env.check_game_over()
-        if done:
-            self.show_result(winner)
+        if len(available_actions) > 0:
+            # 使用 Q-Learning agent 作為對手
+            action = self.q_agent.choose_action(state, available_actions)
+            self.env.step(action)
+            done, winner = self.env.check_game_over()
+
+            if done:
+                self.game_over = True
+                self.winner = winner
+                self.show_result(winner)
 
     def show_result(self, winner):
+        """設置遊戲結果訊息"""
         if winner == 1:
-            result = "Agent Wins!"
+            self.message = "Agent Wins!"
         elif winner == -1:
-            result = "You Win!"
+            self.message = "You Win!"
         else:
-            result = "It's a Draw!"
-        tk.messagebox.showinfo("Game Over", result)
-        self.env.reset()
-        self.draw_grid()
-        self.draw_agent()
+            self.message = "It's a Draw!"
+
+    def draw_board(self):
+        """繪製棋盤"""
+        # 繪製棋盤背景
+        board_rect = pygame.Rect(BOARD_OFFSET_X, BOARD_OFFSET_Y, BOARD_SIZE, BOARD_SIZE)
+        pygame.draw.rect(self.screen, WHITE, board_rect)
+        pygame.draw.rect(self.screen, BLACK, board_rect, 2)
+
+        # 繪製格線
+        for i in range(1, 3):
+            # 垂直線
+            pygame.draw.line(self.screen, BLACK,
+                           (BOARD_OFFSET_X + i * CELL_SIZE, BOARD_OFFSET_Y),
+                           (BOARD_OFFSET_X + i * CELL_SIZE, BOARD_OFFSET_Y + BOARD_SIZE), 2)
+            # 水平線
+            pygame.draw.line(self.screen, BLACK,
+                           (BOARD_OFFSET_X, BOARD_OFFSET_Y + i * CELL_SIZE),
+                           (BOARD_OFFSET_X + BOARD_SIZE, BOARD_OFFSET_Y + i * CELL_SIZE), 2)
+
+        # 繪製 X 和 O
+        for i in range(3):
+            for j in range(3):
+                x = BOARD_OFFSET_X + j * CELL_SIZE
+                y = BOARD_OFFSET_Y + i * CELL_SIZE
+                center_x = x + CELL_SIZE // 2
+                center_y = y + CELL_SIZE // 2
+
+                if self.env.board[i, j] == 1:
+                    # 繪製 X (藍色)
+                    offset = CELL_SIZE // 4
+                    pygame.draw.line(self.screen, BLUE,
+                                   (x + offset, y + offset),
+                                   (x + CELL_SIZE - offset, y + CELL_SIZE - offset), 3)
+                    pygame.draw.line(self.screen, BLUE,
+                                   (x + CELL_SIZE - offset, y + offset),
+                                   (x + offset, y + CELL_SIZE - offset), 3)
+                elif self.env.board[i, j] == -1:
+                    # 繪製 O (紅色)
+                    radius = CELL_SIZE // 3
+                    pygame.draw.circle(self.screen, RED, (center_x, center_y), radius, 3)
+
+    def draw_buttons(self, mouse_pos):
+        """繪製按鈕"""
+        for button in self.buttons:
+            # 檢查按鈕是否應該被禁用
+            disabled = self.training and button['action'] != 'reset'
+
+            # 決定按鈕顏色
+            if disabled:
+                color = BUTTON_DISABLED
+            elif button['rect'].collidepoint(mouse_pos):
+                color = BUTTON_HOVER
+            else:
+                color = button['color']
+
+            pygame.draw.rect(self.screen, color, button['rect'])
+            pygame.draw.rect(self.screen, BLACK, button['rect'], 2)
+
+            # 繪製按鈕文字
+            text_color = GRAY if disabled else WHITE
+            text_surface = self.font.render(button['text'], True, text_color)
+            text_rect = text_surface.get_rect(center=button['rect'].center)
+            self.screen.blit(text_surface, text_rect)
+
+    def draw_progress(self):
+        """繪製進度文字"""
+        text_surface = self.font.render(self.progress_text, True, BLACK)
+        text_rect = text_surface.get_rect(center=(WINDOW_WIDTH // 2, 85))
+        self.screen.blit(text_surface, text_rect)
+
+    def draw_message(self):
+        """繪製遊戲結束訊息"""
+        if self.message:
+            # 繪製半透明背景
+            overlay = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT))
+            overlay.set_alpha(180)
+            overlay.fill(WHITE)
+            self.screen.blit(overlay, (0, 0))
+
+            # 繪製訊息
+            if "Win" in self.message:
+                color = GREEN if "You" in self.message else RED
+            else:
+                color = GRAY
+
+            text_surface = self.message_font.render(self.message, True, color)
+            text_rect = text_surface.get_rect(center=(WINDOW_WIDTH // 2, WINDOW_HEIGHT // 2))
+
+            # 繪製文字背景
+            padding = 20
+            bg_rect = text_rect.inflate(padding * 2, padding * 2)
+            pygame.draw.rect(self.screen, WHITE, bg_rect)
+            pygame.draw.rect(self.screen, color, bg_rect, 3)
+
+            self.screen.blit(text_surface, text_rect)
+
+            # 繪製提示
+            hint_surface = self.font.render("Click anywhere to continue", True, GRAY)
+            hint_rect = hint_surface.get_rect(center=(WINDOW_WIDTH // 2, WINDOW_HEIGHT // 2 + 50))
+            self.screen.blit(hint_surface, hint_rect)
+
+    def run(self):
+        """主循環"""
+        while self.running:
+            mouse_pos = pygame.mouse.get_pos()
+
+            # 事件處理
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    self.running = False
+                elif event.type == pygame.MOUSEBUTTONDOWN:
+                    if self.message:
+                        # 清除訊息，重置遊戲
+                        self.reset_environment()
+                    else:
+                        self.handle_click(mouse_pos)
+
+            # 訓練步驟
+            if self.training:
+                self.train_step()
+
+            # 繪製
+            self.screen.fill(LIGHT_GRAY)
+            self.draw_buttons(mouse_pos)
+            self.draw_progress()
+            self.draw_board()
+            self.draw_message()
+
+            pygame.display.flip()
+            self.clock.tick(60)  # 60 FPS
+
+        pygame.quit()
 
 def main():
-    root = tk.Tk()
-    app = TicTacToeGUI(root)
-    root.mainloop()
+    app = TicTacToeGUI()
+    app.run()
 
 if __name__ == "__main__":
     main()
 
 '''
-介面操作
-Train Q-Learning 按鈕：開始使用 Q-Learning 演算法訓練代理人。
-Train DQN 按鈕：開始使用 DQN 演算法訓練代理人。
-Reset 按鈕：重置遊戲環境和訓練進度。
-遊戲畫布：人類玩家可以點擊格子進行遊戲，觀察訓練好的代理人如何反應。
-訓練進度顯示
-在介面上方有一個進度標籤，顯示目前訓練的 epoch 數量以及總訓練次數（預設為 1000 次）。在訓練過程中，標籤會實時更新，讓你清晰地看到訓練的進展。
-注意事項
-訓練條件：在使用 DQN 進行訓練時，可能需要更長的時間和更多的 epoch 才能看到明顯的效果，特別是在資源有限的環境中。
-參數調整：可以根據需要調整 Q-Learning 和 DQN 的超參數，如學習率 (learning_rate)、折扣因子 (discount_factor) 和 探索率 (epsilon) 等，以優化學習效果。
-圖形化展示：介面會顯示代理人和人類玩家的動作，讓你可以直觀地觀察代理人的學習過程和策略。
-代碼結構詳解
-1. 環境 (TicTacToeEnv)
-狀態表示：使用一個 3x3 的 NumPy 數組來表示棋盤，其中 1 表示玩家1（代理人），-1 表示玩家2（人類），0 表示空格。
-動作執行：根據動作（0-8），將對應的棋盤位置設置為當前玩家的標記。
-勝負判斷：檢查所有行、列和對角線是否有相同的標記，或者是否平局。
-2. 代理人
-Q-Learning (QLearningAgent)
-Q 表：使用一個字典來存儲 (state, action) 對應的 Q 值。
-行動選擇：採用 ε-貪婪策略，根據 Q 值選擇最佳行動或隨機行動。
-學習更新：根據獲得的獎勵和下個狀態的最大 Q 值，更新 Q 表。
-DQN (DQNAgent 和 DQN)
-神經網絡結構 (DQN)：
-三層全連接層，使用 ReLU 激活函數。
-輸入層大小為 9（棋盤的扁平化表示），輸出層大小為 9（對應每個可能的行動）。
-代理人管理 (DQNAgent)：
-使用經驗回放（Replay Memory）來儲存和隨機抽樣經驗。
-更新目標網絡（Target Network）以穩定訓練過程。
-使用均方誤差（MSE）作為損失函數，並使用 Adam 優化器進行訓練。
-3. 圖形化介面 (TicTacToeGUI)
-按鈕區域：
-Train Q-Learning：啟動 Q-Learning 的訓練過程。
-Train DQN：啟動 DQN 的訓練過程。
-Reset：重置遊戲環境和訓練進度。
-進度標籤：顯示當前的訓練進度（如 “Training Q-Learning: 10/1000”）。
-遊戲畫布：繪製 Tic-Tac-Toe 的棋盤和標記，並處理人類玩家的點擊事件。
-4. 訓練流程
-Q-Learning 訓練：
-重置環境。
-在每個 epoch 中，代理人採取行動並學習 Q 值。
-更新進度標籤並繼續訓練直到達到最大 epoch。
-DQN 訓練：
-重置環境。
-在每個 epoch 中，代理人採取行動、存儲經驗並從記憶中抽樣訓練。
-更新目標網絡並更新進度標籤，直到達到最大 epoch。
-結論
-這個範例展示了如何使用 Q-Learning 和 DQN 兩種不同的強化學習策略來訓練一個 Tic-Tac-Toe 代理人。透過圖形化介面，你可以直觀地觀察到代理人的學習進程和策略演變，並進行人機對戰以驗證代理人的學習效果。你可以根據需要對代碼進行擴展和優化，以探索更多強化學習的應用和技術。
+介面操作說明 (使用 pygame)
+=========================
+
+按鈕功能：
+- Train Q-Learning：開始使用 Q-Learning 演算法訓練代理人
+- Train DQN：開始使用 DQN 演算法訓練代理人
+- Reset：重置遊戲環境和訓練進度
+
+遊戲玩法：
+- 在非訓練狀態下，點擊棋盤格子與 AI 對戰
+- 玩家使用紅色圓圈 (O)，AI 使用藍色叉叉 (X)
+- 遊戲結束後會顯示結果訊息，點擊任意處繼續
+
+訓練進度：
+- 介面上方顯示當前訓練的 epoch 數量和總訓練次數（預設為 1000 次）
+- 訓練期間按鈕會變成灰色表示禁用
+- 訓練過程以 60 FPS 進行視覺化更新
+
+視覺設計：
+- 使用現代化配色方案
+- 按鈕支援滑鼠懸停效果
+- 遊戲結果以半透明覆蓋層顯示
+- 清晰的視覺回饋和互動體驗
+
+技術特點：
+- 使用 pygame 實現流暢的 60 FPS 渲染
+- 非阻塞式訓練，可即時觀察訓練過程
+- 完整的事件處理和狀態管理
+- 符合 AI Agents 專案的教育導向設計原則
+
+注意事項：
+- 訓練時間可能較長，特別是 DQN 演算法
+- 可調整學習率、探索率等超參數優化學習效果
+- 建議先訓練後再進行人機對戰以獲得更好的遊戲體驗
 '''
