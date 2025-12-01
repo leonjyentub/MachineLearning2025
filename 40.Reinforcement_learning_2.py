@@ -474,12 +474,10 @@ class TicTacToeGUI:
 
         pygame.quit()
 
-def main():
-    app = TicTacToeGUI()
-    app.run()
 
 if __name__ == "__main__":
-    main()
+    app = TicTacToeGUI()
+    app.run()
 
 '''
 介面操作說明 (使用 pygame)
