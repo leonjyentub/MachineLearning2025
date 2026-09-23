@@ -67,3 +67,7 @@
     *   基本概念 (Agent, Environment, State, Action, Reward)
     *   Q學習 (Q-Learning)
     *   深度Q網路 (Deep Q-Network, DQN)
+
+## License（程式授權）
+
+本專案由作者自行維護；作者具有授權權利的程式碼與文字採用 [Apache License 2.0](LICENSE)。此授權不自動涵蓋外部資料集、下載影像、模型、字型、教材引用內容或其他第三方素材；使用及再散布前請依各自來源條款確認。如個別檔案保留其他作者的著作權與授權聲明，應優先遵守該聲明及 Apache-2.0 的歸屬要求。
